@@ -1,0 +1,17 @@
+{
+    "order": {
+        "id": "ORD-10023",
+        "customer": {
+            "name": "Acme Corp",
+            "email": "billing@acme.com"
+        },
+        "items": [
+            {
+                "sku": "SRV-992",
+                "quantity": 5,
+                "price": 1200.00
+            }
+        ],
+        "status": "NEW"
+    }
+}

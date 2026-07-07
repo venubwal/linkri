@@ -1,0 +1,107 @@
+{
+  "title": "Linkri",
+  "caption": "Where Networks Create Careers",
+  "menu": [
+    {
+      "id": "home",
+      "title": "Home",
+      "url": "#home"
+    },
+    {
+      "id": "about",
+      "title": "About",
+      "url": "#about"
+    },
+    {
+      "id": "why-us",
+      "title": "Why Us",
+      "url": "#why-us"
+    },
+    {
+      "id": "services",
+      "title": "Services",
+      "url": "#services",
+      "submenu": [
+        {
+          "id": "resume-building",
+          "title": "Resume Building",
+          "url": "#"
+        },
+        {
+          "id": "linkedin-makeover",
+          "title": "LinkedIn Profile Makeover",
+          "url": "#"
+        },
+        {
+          "id": "profile-evaluation",
+          "title": "Profile Evaluation (Priority)",
+          "url": "#"
+        },
+        {
+          "id": "employee-referral-pro",
+          "title": "Employee Referral PRO",
+          "url": "#"
+        },
+        {
+          "id": "online-cv",
+          "title": "Online CV",
+          "url": "#"
+        },
+        {
+          "id": "linkedin-recommendations",
+          "title": "LinkedIn Recommendations",
+          "url": "#"
+        },
+        {
+          "id": "naukri-makeover",
+          "title": "Naukri Profile Makeover",
+          "url": "#"
+        },
+        {
+          "id": "mock-interview",
+          "title": "Mock Interview",
+          "url": "#"
+        },
+        {
+          "id": "interview-preparation",
+          "title": "Interview Preparation",
+          "url": "#"
+        },
+        {
+          "id": "all-in-one",
+          "title": "All-in-One Career Build",
+          "url": "#"
+        },
+        {
+          "id": "industry-standards",
+          "title": "Industry Standard Parameters",
+          "url": "#"
+        }
+      ]
+    },
+    {
+      "id": "faqs",
+      "title": "FAQ's",
+      "url": "#faqs"
+    },
+    {
+      "id": "blog",
+      "title": "Blog",
+      "url": "#blog"
+    },
+    {
+      "id": "contact",
+      "title": "Contact Us",
+      "url": "#contact"
+    }
+  ],
+  "placeholders": {
+    "youtube_video": "https://www.youtube.com/embed/72F11twUrR0?autoplay=1&loop=1&playlist=72F11twUrR0",
+    "brand_logo": "/placeholder-logo.svg",
+    "partners": [
+      "/partner1.svg",
+      "/partner2.svg",
+      "/partner3.svg"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+<order>
+    <id>ORD-10023</id>
+    <customer>
+        <name>Acme Corp</name>
+        <email>billing@acme.com</email>
+    </customer>
+    <items>
+        <item>
+            <sku>SRV-992</sku>
+            <quantity>5</quantity>
+            <price>1200.00</price>
+        </item>
+    </items>
+    <status>NEW</status>
+</order>
