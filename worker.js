@@ -1,23 +1,20 @@
-﻿/**
+/**
  * LinkRi Cloudflare Worker
  *
  * - GET  *         -> serve static assets (index.html, JS, CSS, data/*, etc.)
- * - POST /contact  -> proxy form data to FormSubmit server-side (no CORS issue)
+ * - POST /contact  -> send email via Web3Forms API (works from Cloudflare Workers)
  */
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
 
-        // Handle CORS preflight (just in case)
+        // Handle CORS preflight
         if (request.method === 'OPTIONS') {
-            return new Response(null, {
-                status: 204,
-                headers: corsHeaders(),
-            });
+            return new Response(null, { status: 204, headers: corsHeaders() });
         }
 
-        // POST /contact -> server-side FormSubmit proxy
+        // POST /contact -> email handler
         if (request.method === 'POST' && url.pathname === '/contact') {
             return handleContact(request);
         }
@@ -28,95 +25,82 @@ export default {
 };
 
 // ---------------------------------------------------------------------------
-// Contact handler - runs on the server, so FormSubmit has no CORS issue
+// Contact handler — uses Web3Forms API (server-side, no CORS issues)
 // ---------------------------------------------------------------------------
 async function handleContact(request) {
     try {
         const body = await request.json();
-        const {
-            name, mobile, email, message,
-            mail_to,
-            linkedin_profile,
-            naukri_profile,
-        } = body;
+        const { name, mobile, email, message, linkedin_profile, naukri_profile } = body;
 
-        // Basic validation
         if (!name || !mobile || !email || !message) {
             return jsonResponse({ success: false, message: 'Missing required fields.' });
         }
 
-        const target = mail_to || 'LinkRi.Jobs@gmail.com';
+        // Load access key from config
+        const configUrl = new URL('/data/config.properties', request.url);
+        const configResp = await fetch(configUrl);
+        const configText = await configResp.text();
+        const config = parseProperties(configText);
+
+        const accessKey = config['web3forms.access-key'] || 'beff612e-87c9-4ad7-94bf-eb68845b0726';
 
         const payload = {
+            access_key: accessKey,
+            subject:    'LinkRi Contact Form',
             name,
-            mobile,
             email,
+            mobile,
             message,
-            _subject: 'LinkRi Contact - ' + name,
-            _replyto: email,
             ...(linkedin_profile && { linkedin_profile }),
-            ...(naukri_profile && { naukri_profile }),
+            ...(naukri_profile   && { naukri_profile }),
         };
 
-        // Server-side fetch - no browser CORS restriction applies here
-        const fsResponse = await fetch(
-            'https://formsubmit.co/ajax/' + encodeURIComponent(target),
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Origin': 'https://linkri.linkri.workers.dev',
-                    'Referer': 'https://linkri.linkri.workers.dev/',
-                },
-                body: JSON.stringify(payload),
-            }
-        );
+        console.log('Web3Forms: submitting for', name, email);
 
-        // Read raw text first so we can log exactly what FormSubmit sent
-        const rawText = await fsResponse.text();
-        console.log(
-            'FormSubmit raw response:',
-            fsResponse.status,
-            rawText
-        );
+        const response = await fetch('https://api.web3forms.com/submit', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload),
+        });
 
-        // Parse JSON (or fall back to empty object if HTML/garbage returned)
-        let fsResult = {};
-        try { fsResult = JSON.parse(rawText); } catch (_) {}
+        const rawText = await response.text();
+        console.log('Web3Forms response:', response.status, rawText);
 
-        console.log('FormSubmit parsed result:', JSON.stringify(fsResult));
+        let result = {};
+        try { result = JSON.parse(rawText); } catch (_) {}
 
-        // Accept both boolean true and string "true" from FormSubmit
-        const isSuccess = fsResponse.ok &&
-            (fsResult.success === true || fsResult.success === 'true');
-
-        if (isSuccess) {
-            console.log('...FormSubmit SUCCESS');
-            // Always return 200 to the browser; let the JSON body carry the outcome
+        if (response.ok && result.success) {
+            console.log('Web3Forms SUCCESS');
             return jsonResponse({ success: true, message: 'Message sent!' });
         }
 
-        // Activation notice on first use
-        if (fsResult.message && fsResult.message.toLowerCase().includes('activation')) {
-            console.log('...FormSubmit ACTIVATION required');
-            return jsonResponse({
-                success: false,
-                message: 'Please check your inbox to activate the FormSubmit address first.',
-            });
-        }
-
-        console.log('...FormSubmit FAILURE:', JSON.stringify(fsResult));
-        // Return 200 so the browser fetch does not throw; success:false signals the error
+        console.log('Web3Forms FAILURE:', JSON.stringify(result));
         return jsonResponse({
             success: false,
-            message: fsResult.message || ('FormSubmit returned HTTP ' + fsResponse.status),
+            message: result.message || ('Web3Forms returned HTTP ' + response.status),
         });
 
     } catch (err) {
-        console.error('...Contact handler error:', err.message, err.stack);
+        console.error('Contact handler error:', err.message, err.stack);
         return jsonResponse({ success: false, message: 'Internal error: ' + err.message });
     }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+function parseProperties(text) {
+    var config = {};
+    text.split('\n').forEach(function(line) {
+        var trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+            var idx = trimmed.indexOf('=');
+            if (idx > 0) {
+                config[trimmed.slice(0, idx).trim()] = trimmed.slice(idx + 1).trim();
+            }
+        }
+    });
+    return config;
 }
 
 function jsonResponse(data, status) {

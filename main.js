@@ -233,21 +233,40 @@ document.addEventListener("DOMContentLoaded", () => {
         statusDiv.innerText = 'Sending your message…';
 
         try {
-            const config  = await loadConfig();
-            const mailTo  = config['mail.to'] || 'LinkRi.Jobs@gmail.com';
+            const config    = await loadConfig();
+            const accessKey = config['web3forms.access-key'] || 'beff612e-87c9-4ad7-94bf-eb68845b0726';
 
-            // POST to same-origin /contact — handled by the Cloudflare Worker
-            // (server-side fetch to FormSubmit, no CORS restriction)
-            const response = await fetch('/contact', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body:    JSON.stringify({
-                    name, mobile, email, message,
-                    mail_to: mailTo,
-                    ...(linkedin && { linkedin_profile: linkedin }),
-                    ...(naukri   && { naukri_profile:  naukri   }),
-                }),
-            });
+            let response;
+
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                // ── Local dev: Python HTTP server can't handle POST /contact,
+                //    so call Web3Forms directly from the browser (CORS supported).
+                console.log('Local mode: calling Web3Forms directly from browser');
+                response = await fetch('https://api.web3forms.com/submit', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        access_key: accessKey,
+                        subject:    'LinkRi Contact Form',
+                        name, email, mobile, message,
+                        ...(linkedin && { linkedin_profile: linkedin }),
+                        ...(naukri   && { naukri_profile:  naukri   }),
+                    }),
+                });
+            } else {
+                // ── Cloudflare Workers (or any real server): proxy through /contact
+                //    so Web3Forms is called server-side with no CORS restriction.
+                console.log('Worker mode: proxying via /contact');
+                response = await fetch('/contact', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body:    JSON.stringify({
+                        name, mobile, email, message,
+                        ...(linkedin && { linkedin_profile: linkedin }),
+                        ...(naukri   && { naukri_profile:  naukri   }),
+                    }),
+                });
+            }
 
             const result = await response.json();
             console.log('Contact result:', result);
