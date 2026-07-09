@@ -1,15 +1,15 @@
-/**
+ï»¿/**
  * LinkRi Cloudflare Worker
  *
- * - GET  *         ? serve static assets (index.html, JS, CSS, data/*, etc.)
- * - POST /contact  ? proxy form data to FormSubmit server-side (no CORS issue)
+ * - GET  *         -> serve static assets (index.html, JS, CSS, data/*, etc.)
+ * - POST /contact  -> proxy form data to FormSubmit server-side (no CORS issue)
  */
 
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
 
-        // -- Handle CORS preflight (just in case) ----------------------------
+        // Handle CORS preflight (just in case)
         if (request.method === 'OPTIONS') {
             return new Response(null, {
                 status: 204,
@@ -17,18 +17,18 @@ export default {
             });
         }
 
-        // -- POST /contact ? server-side FormSubmit proxy ---------------------
+        // POST /contact -> server-side FormSubmit proxy
         if (request.method === 'POST' && url.pathname === '/contact') {
             return handleContact(request);
         }
 
-        // -- All other requests ? serve static assets -------------------------
+        // All other requests -> serve static assets
         return env.ASSETS.fetch(request);
     },
 };
 
 // ---------------------------------------------------------------------------
-// Contact handler — runs on the server, so FormSubmit has no CORS issue
+// Contact handler - runs on the server, so FormSubmit has no CORS issue
 // ---------------------------------------------------------------------------
 async function handleContact(request) {
     try {
@@ -52,15 +52,15 @@ async function handleContact(request) {
             mobile,
             email,
             message,
-            _subject: `LinkRi Contact - ${name}`,
+            _subject: 'LinkRi Contact - ' + name,
             _replyto: email,
             ...(linkedin_profile && { linkedin_profile }),
-            ...(naukri_profile   && { naukri_profile }),
+            ...(naukri_profile && { naukri_profile }),
         };
 
-        // Server-side fetch — no browser CORS restriction applies here
+        // Server-side fetch - no browser CORS restriction applies here
         const fsResponse = await fetch(
-            `https://formsubmit.co/ajax/${encodeURIComponent(target)}`,
+            'https://formsubmit.co/ajax/' + encodeURIComponent(target),
             {
                 method: 'POST',
                 headers: {
@@ -74,35 +74,45 @@ async function handleContact(request) {
         );
 
         const fsResult = await fsResponse.json().catch(() => ({}));
-        console.log('FormSubmit response:', fsResponse.status, fsResult);
+
+        // Log every outcome for Cloudflare dashboard / wrangler tail
+        console.log(
+            'FormSubmit response:',
+            fsResponse.status,
+            JSON.stringify(fsResult)
+        );
 
         if (fsResponse.ok && fsResult.success === 'true') {
+            console.log('...FormSubmit SUCCESS:', JSON.stringify(fsResult));
             return jsonResponse({ success: true, message: 'Message sent!' });
         }
 
         // FormSubmit may return activation notice on first use
         if (fsResult.message && fsResult.message.toLowerCase().includes('activation')) {
+            console.log('...FormSubmit ACTIVATION required:', JSON.stringify(fsResult));
             return jsonResponse({
                 success: false,
                 message: 'Please check your inbox to activate the FormSubmit address first.',
             });
         }
 
+        console.log('...FormSubmit FAILURE / unexpected response:', JSON.stringify(fsResult));
         return jsonResponse({
             success: false,
             message: fsResult.message || 'FormSubmit did not confirm delivery.',
         }, 502);
 
     } catch (err) {
-        console.error('Contact handler error:', err);
-        return jsonResponse({ success: false, message: 'Internal error.' }, 500);
+        console.error('...Contact handler error:', err.message, err.stack);
+        return jsonResponse({ success: false, message: 'Internal error: ' + err.message }, 500);
     }
 }
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status) {
+    if (status === undefined) status = 200;
     return new Response(JSON.stringify(data), {
-        status,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+        status: status,
+        headers: Object.assign({ 'Content-Type': 'application/json' }, corsHeaders()),
     });
 }
 
