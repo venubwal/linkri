@@ -42,7 +42,7 @@ async function handleContact(request) {
 
         // Basic validation
         if (!name || !mobile || !email || !message) {
-            return jsonResponse({ success: false, message: 'Missing required fields.' }, 400);
+            return jsonResponse({ success: false, message: 'Missing required fields.' });
         }
 
         const target = mail_to || 'LinkRi.Jobs@gmail.com';
@@ -73,38 +73,49 @@ async function handleContact(request) {
             }
         );
 
-        const fsResult = await fsResponse.json().catch(() => ({}));
-
-        // Log every outcome for Cloudflare dashboard / wrangler tail
+        // Read raw text first so we can log exactly what FormSubmit sent
+        const rawText = await fsResponse.text();
         console.log(
-            'FormSubmit response:',
+            'FormSubmit raw response:',
             fsResponse.status,
-            JSON.stringify(fsResult)
+            rawText
         );
 
-        if (fsResponse.ok && fsResult.success === 'true') {
-            console.log('...FormSubmit SUCCESS:', JSON.stringify(fsResult));
+        // Parse JSON (or fall back to empty object if HTML/garbage returned)
+        let fsResult = {};
+        try { fsResult = JSON.parse(rawText); } catch (_) {}
+
+        console.log('FormSubmit parsed result:', JSON.stringify(fsResult));
+
+        // Accept both boolean true and string "true" from FormSubmit
+        const isSuccess = fsResponse.ok &&
+            (fsResult.success === true || fsResult.success === 'true');
+
+        if (isSuccess) {
+            console.log('...FormSubmit SUCCESS');
+            // Always return 200 to the browser; let the JSON body carry the outcome
             return jsonResponse({ success: true, message: 'Message sent!' });
         }
 
-        // FormSubmit may return activation notice on first use
+        // Activation notice on first use
         if (fsResult.message && fsResult.message.toLowerCase().includes('activation')) {
-            console.log('...FormSubmit ACTIVATION required:', JSON.stringify(fsResult));
+            console.log('...FormSubmit ACTIVATION required');
             return jsonResponse({
                 success: false,
                 message: 'Please check your inbox to activate the FormSubmit address first.',
             });
         }
 
-        console.log('...FormSubmit FAILURE / unexpected response:', JSON.stringify(fsResult));
+        console.log('...FormSubmit FAILURE:', JSON.stringify(fsResult));
+        // Return 200 so the browser fetch does not throw; success:false signals the error
         return jsonResponse({
             success: false,
-            message: fsResult.message || 'FormSubmit did not confirm delivery.',
-        }, 502);
+            message: fsResult.message || ('FormSubmit returned HTTP ' + fsResponse.status),
+        });
 
     } catch (err) {
         console.error('...Contact handler error:', err.message, err.stack);
-        return jsonResponse({ success: false, message: 'Internal error: ' + err.message }, 500);
+        return jsonResponse({ success: false, message: 'Internal error: ' + err.message });
     }
 }
 
