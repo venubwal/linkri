@@ -6,7 +6,19 @@ const pageContent = {
                 <p>Where Networks Create Careers</p>
             </div>
             <div class="page-body">
-                <p>At Linkri, we believe that the best opportunities are found through connections. We are pioneers in redefining how professionals discover, engage with, and secure top-tier roles across the globe.</p>
+                <p>
+                With over 20 years of experience in the technology industry, the founder created LinkRi with a simple vision: to help job seekers discover the best career opportunities through the power of trusted professional networks and corporate connections.<br><br>
+
+Having worked closely with global organizations, hiring managers, engineering teams, and industry professionals, the founder recognized that many exceptional opportunities are never reached through traditional job portals alone. Strong networks, referrals, and professional relationships often play a crucial role in connecting the right talent with the right opportunity.<br><br>
+
+At LinkRi, we believe that the best opportunities are found through meaningful connections. We are redefining how professionals discover, engage with, and secure rewarding career opportunities by leveraging the strength of corporate networks and professional communities.<br><br>
+
+Whether you are an experienced professional, a recent graduate, or someone looking for the next step in your career journey, LinkRi provides a platform where connections create possibilities and networks open doors.<br><br>
+
+Join our network today—because your next opportunity may already be within our network, which soon becomes your network.<br><br>
+
+<b>LinkRi – Where Networks Create Careers</b>
+                </p>
                 <div class="features-grid" style="margin-top: 3rem;">
                     <div class="feature-card">
                         <div class="feature-icon">🌐</div>
@@ -231,27 +243,27 @@ const pageContent = {
                 <form class="contact-form" id="contact-form">
                     <div class="form-group">
                         <label>Name</label>
-                        <input type="text" id="contact-name" placeholder="Your Full Name" required />
+                        <input type="text" id="contact-name" name="name" placeholder="Your Full Name" required />
                     </div>
                     <div class="form-group">
                         <label>Mobile Number</label>
-                        <input type="tel" id="contact-mobile" placeholder="Your Mobile Number" required />
+                        <input type="tel" id="contact-mobile" name="mobile" placeholder="Your Mobile Number" required />
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" id="contact-email" placeholder="you@example.com" required />
+                        <input type="email" id="contact-email" name="email" placeholder="you@example.com" required />
                     </div>
                     <div class="form-group">
                         <label>LinkedIn Profile <span style="font-size:0.8em; opacity:0.6;">(optional)</span></label>
-                        <input type="url" id="contact-linkedin" placeholder="https://www.linkedin.com/in/your-profile" />
+                        <input type="url" id="contact-linkedin" name="linkedin_profile" placeholder="https://www.linkedin.com/in/your-profile" />
                     </div>
                     <div class="form-group">
                         <label>Naukri Profile <span style="font-size:0.8em; opacity:0.6;">(optional)</span></label>
-                        <input type="url" id="contact-naukri" placeholder="https://www.naukri.com/mnjuser/profile?id=your-id" />
+                        <input type="url" id="contact-naukri" name="naukri_profile" placeholder="https://www.naukri.com/mnjuser/profile?id=your-id" />
                     </div>
                     <div class="form-group">
                         <label>Message</label>
-                        <textarea id="contact-message" rows="4" placeholder="How can we help you?" required></textarea>
+                        <textarea id="contact-message" name="message" rows="4" placeholder="How can we help you?" required></textarea>
                     </div>
                     <button type="submit" id="contact-submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Send Message</button>
                 </form>

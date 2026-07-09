@@ -185,106 +185,91 @@ document.addEventListener("DOMContentLoaded", () => {
                hash === '#contact-us' || hash === '#contact-us-section';
     }
 
-    // Event delegation for contact form submit
+    // ── Contact form → /contact (same-origin Worker proxy, no CORS) ──────────
     document.addEventListener('click', async (e) => {
         const submitBtn = e.target.closest('#contact-submit');
-        if (submitBtn) {
-            console.log("Delegated click: #contact-submit clicked!");
-            e.preventDefault();
+        if (!submitBtn) return;
+        e.preventDefault();
 
-            const form = document.getElementById('contact-form');
-            const nameEl = document.getElementById('contact-name');
-            const mobileEl = document.getElementById('contact-mobile');
-            const emailEl = document.getElementById('contact-email');
-            const linkedinEl = document.getElementById('contact-linkedin');
-            const naukriEl = document.getElementById('contact-naukri');
-            const messageEl = document.getElementById('contact-message');
+        const nameEl     = document.getElementById('contact-name');
+        const mobileEl   = document.getElementById('contact-mobile');
+        const emailEl    = document.getElementById('contact-email');
+        const linkedinEl = document.getElementById('contact-linkedin');
+        const naukriEl   = document.getElementById('contact-naukri');
+        const messageEl  = document.getElementById('contact-message');
+        const form       = document.getElementById('contact-form');
 
-            if (!nameEl || !mobileEl || !emailEl || !messageEl) {
-                console.error("Delegated click: Form input elements missing from DOM!");
-                return;
+        if (!nameEl || !mobileEl || !emailEl || !messageEl) return;
+
+        const name     = nameEl.value.trim();
+        const mobile   = mobileEl.value.trim();
+        const email    = emailEl.value.trim();
+        const linkedin = linkedinEl ? linkedinEl.value.trim() : '';
+        const naukri   = naukriEl   ? naukriEl.value.trim()   : '';
+        const message  = messageEl.value.trim();
+
+        // Inline status div (created once, reused)
+        let statusDiv = document.getElementById('contact-status');
+        if (!statusDiv) {
+            statusDiv = document.createElement('div');
+            statusDiv.id = 'contact-status';
+            statusDiv.style.cssText = 'margin-top:1rem;font-weight:600;text-align:center;';
+            if (form) form.appendChild(statusDiv);
+        }
+        statusDiv.style.display = 'block';
+
+        // Validate required fields
+        if (!name || !mobile || !email || !message) {
+            statusDiv.style.color = '#ef4444';
+            statusDiv.innerText = 'Please fill in all required fields.';
+            return;
+        }
+
+        // Disable button while submitting
+        const originalLabel = submitBtn.innerText;
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Sending…';
+        statusDiv.style.color = '#3b82f6';
+        statusDiv.innerText = 'Sending your message…';
+
+        try {
+            const config  = await loadConfig();
+            const mailTo  = config['mail.to'] || 'LinkRi.Jobs@gmail.com';
+
+            // POST to same-origin /contact — handled by the Cloudflare Worker
+            // (server-side fetch to FormSubmit, no CORS restriction)
+            const response = await fetch('/contact', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body:    JSON.stringify({
+                    name, mobile, email, message,
+                    mail_to: mailTo,
+                    ...(linkedin && { linkedin_profile: linkedin }),
+                    ...(naukri   && { naukri_profile:  naukri   }),
+                }),
+            });
+
+            const result = await response.json();
+            console.log('Contact result:', result);
+
+            if (result.success) {
+                statusDiv.style.color = '#10b981';
+                statusDiv.innerText = '✅ Message sent! We will get back to you soon.';
+                if (form) form.reset();
+            } else {
+                throw new Error(result.message || 'Submission failed');
             }
-
-            const name = nameEl.value.trim();
-            const mobile = mobileEl.value.trim();
-            const email = emailEl.value.trim();
-            const linkedin = linkedinEl ? linkedinEl.value.trim() : '';
-            const naukri = naukriEl ? naukriEl.value.trim() : '';
-            const message = messageEl.value.trim();
-            console.log("Delegated click: Form inputs read:", { name, mobile, email, linkedin, naukri, message });
-
-            let statusDiv = document.getElementById('contact-status');
-            if (!statusDiv) {
-                statusDiv = document.createElement('div');
-                statusDiv.id = 'contact-status';
-                statusDiv.style.marginTop = '1rem';
-                statusDiv.style.fontWeight = '600';
-                statusDiv.style.textAlign = 'center';
-                if (form) form.appendChild(statusDiv);
-            }
-
-            statusDiv.style.display = 'block';
-            statusDiv.style.color = '#3b82f6';
-            statusDiv.innerText = 'Sending message...';
-
-            if (!name || !mobile || !email || !message) {
-                console.warn("Delegated click: Form validation failed (missing fields)");
-                statusDiv.style.color = '#ef4444';
-                statusDiv.innerText = 'Please fill in all fields.';
-                return;
-            }
-
-            console.log("Delegated click: Loading configurations...");
-            const config = await loadConfig();
-            const mailTo = config['mail.to'] || 'LinkRi.Jobs@gmail.com';
-            console.log("Delegated click: Mail To:", mailTo);
-
-            try {
-                console.log("Delegated click: Sending fetch request to formsubmit.co...");
-                const response = await fetch(`https://formsubmit.co/ajax/${mailTo}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        name: name,
-                        mobile: mobile,
-                        email: email,
-                        ...(linkedin && { linkedin_profile: linkedin }),
-                        ...(naukri && { naukri_profile: naukri }),
-                        message: message,
-                        _subject: name,
-                        _replyto: email
-                    })
-                });
-
-                console.log("Delegated click: Response received. Status:", response.status);
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log("Delegated click: Result payload:", result);
-                    if (result.success === 'true') {
-                        statusDiv.style.color = '#10b981';
-                        statusDiv.innerText = 'Message sent successfully!';
-                        if (form) form.reset();
-                    } else if (result.message && result.message.includes('Activation')) {
-                        statusDiv.style.color = '#d97706';
-                        statusDiv.innerText = 'Activation email sent! Please check your inbox to activate this form.';
-                    } else {
-                        statusDiv.style.color = '#ef4444';
-                        statusDiv.innerText = 'Message is not sent; pls try again';
-                    }
-                } else {
-                    statusDiv.style.color = '#ef4444';
-                    statusDiv.innerText = 'Message is not sent; pls try again';
-                }
-            } catch (error) {
-                console.error("Delegated click: Error sending email in catch:", error);
-                statusDiv.style.color = '#ef4444';
-                statusDiv.innerText = 'Message is not sent; pls try again';
-            }
+        } catch (err) {
+            console.error('Contact form error:', err);
+            statusDiv.style.color = '#ef4444';
+            statusDiv.innerText = '❌ Could not send message. Please try again.';
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = originalLabel;
         }
     });
+
+
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SPA ROUTER
