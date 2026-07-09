@@ -1,6 +1,4 @@
 name = "linkri"
 compatibility_date = "2026-07-04"
 main = "worker.js"
-
-[assets]
-directory = "."
+
