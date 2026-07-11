@@ -2,7 +2,7 @@ const pageContent = {
     '#about': `
         <div class="page-container fade-in">
             <div class="page-header">
-                <h2>About Linkri</h2>
+                <h2>About LinkRi</h2>
                 <p>Where Networks Create Careers</p>
             </div>
             <div class="page-body">
@@ -17,7 +17,7 @@ Whether you are an experienced professional, a recent graduate, or someone looki
 
 Join our network today—because your next opportunity may already be within our network, which soon becomes your network.<br><br>
 
-<b>LinkRi – Where Networks Create Careers</b>
+<b>LinkRi – Connecting People, Creating Careers</b> 
                 </p>
                 <div class="features-grid" style="margin-top: 3rem;">
                     <div class="feature-card">
@@ -240,7 +240,14 @@ Join our network today—because your next opportunity may already be within our
                 <p>Let's build your future together</p>
             </div>
             <div class="page-body" style="max-width: 600px; margin: 0 auto;">
-                <form class="contact-form" id="contact-form">
+                <form class="contact-form" id="contact-form"
+                      action="https://formsubmit.co/LinkRi.Jobs@gmail.com"
+                      method="POST">
+                    <!-- FormSubmit hidden config -->
+                    <input type="hidden" name="_subject" value="New Contact from LinkRi" />
+                    <input type="hidden" name="_captcha" value="false" />
+                    <input type="hidden" name="_next" value="https://linkri.linkri.workers.dev/#contact-success" />
+
                     <div class="form-group">
                         <label>Name</label>
                         <input type="text" id="contact-name" name="name" placeholder="Your Full Name" required />

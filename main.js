@@ -58,6 +58,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const VideoManager = (() => {
         const _videos = new Set();            // all registered HTMLVideoElement refs
         let _unmuteCleanup = null;            // active unmute-on-interaction remover
+        let _currentVideo = null;             // the video that should be playing right now
+        const _savedTimes = {};               // saved playback offsets keyed by video.id
 
         /** Register a video element so the manager knows about it. */
         function register(video) {
@@ -69,10 +71,18 @@ document.addEventListener("DOMContentLoaded", () => {
         function stopAll(reason) {
             console.log(`[VideoManager] stopAll() reason="${reason || 'navigation'}"`);
             _videos.forEach(v => {
+                // Save playback position before pausing so we can resume later
+                if (v.id && v.currentTime > 0) {
+                    _savedTimes[v.id] = v.currentTime;
+                    console.log(`[VideoManager] saved time for #${v.id}: ${v.currentTime.toFixed(2)}s`);
+                }
                 if (!v.paused) v.pause();
             });
             // Also catch any video elements not yet registered (e.g. dynamicContent)
             document.querySelectorAll('video').forEach(v => {
+                if (v.id && v.currentTime > 0) {
+                    _savedTimes[v.id] = v.currentTime;
+                }
                 if (!v.paused) v.pause();
                 _videos.add(v);
             });
@@ -80,17 +90,43 @@ document.addEventListener("DOMContentLoaded", () => {
                 _unmuteCleanup();
                 _unmuteCleanup = null;
             }
+            _currentVideo = null;
+        }
+
+        /** Resume the currently active video (called on tab-visible / focus). */
+        function resumeCurrent() {
+            if (_currentVideo && _currentVideo.paused) {
+                _currentVideo.play().catch(e =>
+                    console.warn('[VideoManager] resume failed:', e)
+                );
+            }
+        }
+
+        /**
+         * Restore a previously saved playback offset onto a (possibly new)
+         * video element. Call this right after injecting HTML that contains
+         * the video, before calling playWithAudio().
+         */
+        function restoreTime(video) {
+            if (!video || !video.id) return;
+            const saved = _savedTimes[video.id];
+            if (saved && saved > 0) {
+                video.currentTime = saved;
+                console.log(`[VideoManager] restored time for #${video.id}: ${saved.toFixed(2)}s`);
+            }
         }
 
         /**
          * Play a video with audio.
          * - Tries unmuted first.
          * - Falls back to muted + unmute-on-first-interaction.
-         * Cancels any previous unmute listener before setting up a new one.
+         * @param {HTMLVideoElement} video
+         * @param {number} [startTime]  Optional offset in seconds to seek to before playing.
          */
-        async function playWithAudio(video) {
+        async function playWithAudio(video, startTime) {
             if (!video) return;
             register(video);
+            _currentVideo = video;
 
             // Cancel any leftover unmute listener from a previous play
             if (_unmuteCleanup) {
@@ -98,50 +134,73 @@ document.addEventListener("DOMContentLoaded", () => {
                 _unmuteCleanup = null;
             }
 
-            video.muted = false;
-            try {
-                await video.play();
-                console.log(`[VideoManager] Audible autoplay succeeded for #${video.id}`);
-            } catch {
-                console.log(`[VideoManager] Audible blocked for #${video.id}, starting muted...`);
-                video.muted = true;
+            // Core seek-and-play logic (runs once video metadata is available)
+            const _doPlay = async () => {
+                // Seek to saved position if one was provided
+                if (startTime !== undefined && startTime > 0) {
+                    video.currentTime = startTime;
+                }
+
+                video.muted = false;
                 try {
                     await video.play();
-                    console.log(`[VideoManager] Muted autoplay succeeded for #${video.id}`);
+                    console.log(`[VideoManager] Audible autoplay succeeded for #${video.id}`);
+                } catch {
+                    console.log(`[VideoManager] Audible blocked for #${video.id}, starting muted...`);
+                    video.muted = true;
+                    try {
+                        await video.play();
+                        console.log(`[VideoManager] Muted autoplay succeeded for #${video.id}`);
 
-                    // Unmute on first interaction
-                    const unmute = () => {
-                        video.muted = false;
-                        video.play().catch(e => console.warn('[VideoManager] unmute retry failed:', e));
-                        cleanup();
-                    };
-                    const cleanup = () => {
-                        document.removeEventListener('click', unmute);
-                        document.removeEventListener('touchstart', unmute);
-                        _unmuteCleanup = null;
-                    };
-                    document.addEventListener('click', unmute);
-                    document.addEventListener('touchstart', unmute);
-                    _unmuteCleanup = cleanup;
-                } catch (err2) {
-                    console.error(`[VideoManager] Muted autoplay also failed for #${video.id}:`, err2);
+                        // Unmute on first interaction (silent fallback)
+                        const unmute = () => {
+                            video.muted = false;
+                            video.play().catch(e => console.warn('[VideoManager] unmute retry failed:', e));
+                            cleanup();
+                        };
+                        const cleanup = () => {
+                            document.removeEventListener('click', unmute);
+                            document.removeEventListener('touchstart', unmute);
+                            _unmuteCleanup = null;
+                        };
+                        document.addEventListener('click', unmute);
+                        document.addEventListener('touchstart', unmute);
+                        _unmuteCleanup = cleanup;
+                    } catch (err2) {
+                        console.error(`[VideoManager] Muted autoplay also failed for #${video.id}:`, err2);
+                    }
                 }
+            };
+
+            // If we need to seek but metadata isn't loaded yet, wait for it first
+            if (startTime !== undefined && startTime > 0 && video.readyState < 1) {
+                video.addEventListener('loadedmetadata', _doPlay, { once: true });
+            } else {
+                await _doPlay();
             }
         }
 
-        return { register, stopAll, playWithAudio };
+        /** Return the last saved playback offset for a video id, or 0. */
+        function getSavedTime(videoId) {
+            return _savedTimes[videoId] || 0;
+        }
+
+        return { register, stopAll, resumeCurrent, restoreTime, getSavedTime, playWithAudio };
     })();
 
-    // ── Pause ALL videos on any browser-leave event ───────────────────────────
+    // ── Pause ALL videos when tab is hidden; resume when it becomes visible ───
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) VideoManager.stopAll('tab hidden');
-        // Resume is intentionally NOT done here — user must see the page again
-        // and explicitly be on a video page; handleRoute will resume if needed.
+        if (document.hidden) {
+            VideoManager.stopAll('tab hidden');
+        } else {
+            VideoManager.resumeCurrent();
+        }
     });
 
-    window.addEventListener('blur', () => VideoManager.stopAll('window blur'));
-
-    document.addEventListener('mouseleave', () => VideoManager.stopAll('mouse left viewport'));
+    // Resume video when the window regains focus (e.g. switching back from
+    // another app). We do NOT stop on blur — that was too aggressive and
+    // caused the About-page video to freeze whenever the mouse left the window.
+    window.addEventListener('focus', () => VideoManager.resumeCurrent());
 
     // ── Home video play/pause toggle button ───────────────────────────────────
     const PAUSE_ICON = `<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>`;
@@ -334,12 +393,52 @@ document.addEventListener("DOMContentLoaded", () => {
             window.scrollTo(0, 0);
             updateVisitorCounters();
 
-            // Auto-start the About page video
+            // Auto-start the About page video, resuming from saved position
             if (hash === '#about') {
                 const video = document.getElementById('about-what-we-do-video');
                 if (video) {
                     VideoManager.register(video);
-                    VideoManager.playWithAudio(video);
+
+                    // ── Inject a visible mute/unmute button overlay ──────────
+                    const wrapper = video.parentElement;
+                    if (wrapper && !document.getElementById('about-video-mute-btn')) {
+                        const muteBtn = document.createElement('button');
+                        muteBtn.id = 'about-video-mute-btn';
+                        muteBtn.title = 'Click to unmute';
+                        muteBtn.style.cssText = [
+                            'position:absolute', 'bottom:8px', 'right:8px', 'z-index:10',
+                            'background:rgba(0,0,0,0.55)', 'border:none', 'border-radius:50%',
+                            'width:36px', 'height:36px', 'cursor:pointer',
+                            'display:flex', 'align-items:center', 'justify-content:center',
+                            'backdrop-filter:blur(4px)', 'font-size:16px', 'transition:background 0.2s'
+                        ].join(';');
+
+                        const syncIcon = () => {
+                            muteBtn.textContent = video.muted ? '🔇' : '🔊';
+                            muteBtn.title = video.muted ? 'Click to unmute' : 'Click to mute';
+                        };
+                        syncIcon();
+
+                        muteBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            video.muted = !video.muted;
+                            if (!video.muted && video.paused) {
+                                video.play().catch(() => {});
+                            }
+                            syncIcon();
+                        });
+                        muteBtn.addEventListener('mouseenter', () => muteBtn.style.background = 'rgba(0,0,0,0.8)');
+                        muteBtn.addEventListener('mouseleave', () => muteBtn.style.background = 'rgba(0,0,0,0.55)');
+
+                        // Keep button in sync when JS mutes/unmutes internally
+                        video.addEventListener('volumechange', syncIcon);
+
+                        wrapper.appendChild(muteBtn);
+                    }
+
+                    // ── Play from saved offset (waits for loadedmetadata if needed) ─
+                    const savedTime = VideoManager.getSavedTime('about-what-we-do-video');
+                    VideoManager.playWithAudio(video, savedTime);
                 }
             }
         } else {
