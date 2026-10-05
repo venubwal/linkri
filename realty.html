@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realty - Linkri</title>
+    <style>
+        :root {
+            --transition-duration: 2s;
+            --zoom-duration: 8s;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Container for the slideshow */
+        #slideshow-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Individual slide styling */
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transition: opacity var(--transition-duration) ease-in-out;
+            z-index: 1;
+            /* Ken Burns Effect initial state */
+            transform: scale(1);
+        }
+
+        /* Active slide */
+        .slide.active {
+            opacity: 1;
+            z-index: 2;
+            /* Ken Burns Effect animation */
+            animation: kenBurns var(--zoom-duration) linear forwards;
+        }
+
+        /* Previous slide to keep it visible while next one fades in */
+        .slide.prev {
+            opacity: 1;
+            z-index: 1;
+            transform: scale(1.1); /* Assuming it finished the ken burns */
+        }
+
+        /* Keyframes for smooth slow zoom */
+        @keyframes kenBurns {
+            0% {
+                transform: scale(1);
+            }
+            100% {
+                transform: scale(1.15);
+            }
+        }
+
+        /* Overlay text / logo */
+        .overlay {
+            position: absolute;
+            z-index: 10;
+            bottom: 40px;
+            left: 40px;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        .overlay h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .overlay p {
+            margin: 8px 0 0 0;
+            font-size: 1.1rem;
+            font-weight: 300;
+            opacity: 0.8;
+        }
+
+        /* Progress Bar */
+        #progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 4px;
+            background-color: rgba(255,255,255,0.7);
+            z-index: 10;
+            width: 0%;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .overlay {
+                bottom: 20px;
+                left: 20px;
+                text-align: left;
+            }
+            .overlay h1 {
+                font-size: 1.8rem;
+            }
+            .overlay p {
+                font-size: 0.9rem;
+            }
+            .slide {
+                background-size: contain; /* Or cover depending on aspect ratio preference */
+                background-color: #050505; /* Fill gaps if using contain */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="slideshow-container">
+        <!-- Slides will be injected here via JavaScript -->
+    </div>
+
+    <div class="overlay">
+        <h1>Linkri Realty</h1>
+        <p>Discover Premium Spaces</p>
+    </div>
+    
+    <div id="progress-bar"></div>
+
+    <script>
+        // List of images from the realty folder. 
+        // Note: For a purely static HTML file, this array needs to be manually updated
+        // or generated via a backend script when new images are added.
+        const images = [
+            'realty/main.png',
+            // Add more image paths here like:
+            // 'realty/image1.jpg',
+            // 'realty/image2.gif',
+        ];
+
+        const slideDuration = 6000; // Total time per slide (ms)
+        const container = document.getElementById('slideshow-container');
+        const progressBar = document.getElementById('progress-bar');
+        
+        let currentIndex = 0;
+        let slides = [];
+
+        function initSlideshow() {
+            if (images.length === 0) {
+                container.innerHTML = '<h2 style="color:white; z-index:10;">No images found.</h2>';
+                return;
+            }
+
+            // Create slide elements
+            images.forEach((src, index) => {
+                const slide = document.createElement('div');
+                slide.className = 'slide';
+                slide.style.backgroundImage = `url('${src}')`;
+                container.appendChild(slide);
+                slides.push(slide);
+            });
+
+            // Start the first slide
+            slides[currentIndex].classList.add('active');
+            animateProgressBar();
+
+            // Setup interval for subsequent slides
+            if (images.length > 1) {
+                setInterval(nextSlide, slideDuration);
+            }
+        }
+
+        function nextSlide() {
+            // Keep previous slide visible underneath during transition
+            const prevIndex = currentIndex;
+            slides[prevIndex].classList.remove('active');
+            slides[prevIndex].classList.add('prev');
+
+            // Move to next slide
+            currentIndex = (currentIndex + 1) % images.length;
+            
+            // Bring in the new active slide
+            slides[currentIndex].classList.remove('prev');
+            slides[currentIndex].classList.add('active');
+
+            // Clean up the 'prev' class from the slide before last after transition
+            setTimeout(() => {
+                slides[prevIndex].classList.remove('prev');
+            }, 2000); // Matches the --transition-duration
+
+            // Reset and animate progress bar
+            animateProgressBar();
+        }
+
+        function animateProgressBar() {
+            progressBar.style.transition = 'none';
+            progressBar.style.width = '0%';
+            
+            // Small timeout to allow the browser to register the width reset
+            setTimeout(() => {
+                progressBar.style.transition = `width ${slideDuration}ms linear`;
+                progressBar.style.width = '100%';
+            }, 50);
+        }
+
+        // Preload images for smoother transitions
+        window.onload = () => {
+            let loadedCount = 0;
+            if (images.length === 0) {
+                initSlideshow();
+                return;
+            }
+            images.forEach(src => {
+                const img = new Image();
+                img.src = src;
+                img.onload = () => {
+                    loadedCount++;
+                    if (loadedCount === images.length) {
+                        // All images preloaded
+                    }
+                };
+            });
+            // Start slideshow immediately, regardless of full preload
+            initSlideshow();
+        };
+    </script>
+</body>
+</html>
